@@ -49,8 +49,8 @@ export function calculateRisk(state: PatientState): RiskAssessment {
       score += 3;
       factors.push({ description: "Chest pain (severe)", weight: 3 });
     } else if (chestPain.severity.value === "moderate") {
-      score += 1.5;
-      factors.push({ description: "Chest pain (moderate)", weight: 1.5 });
+      score += 2;
+      factors.push({ description: "Chest pain (moderate)", weight: 2 });
     } else if (chestPain.severity.status === "Unknown") {
       missingCritical.push("Chest pain severity");
     }
@@ -84,6 +84,18 @@ export function calculateRisk(state: PatientState): RiskAssessment {
     missingCritical.push("Heart rate");
   }
 
+  // ── Systolic Blood Pressure scoring ──
+  const sbp = state.vitals.bloodPressureSystolic.value;
+  if (sbp !== null) {
+    if (sbp >= 160) {
+      score += 1;
+      factors.push({ description: `Systolic BP ${sbp} mmHg (Stage 2 HTN)`, weight: 1 });
+    } else if (sbp >= 140) {
+      score += 0.5;
+      factors.push({ description: `Systolic BP ${sbp} mmHg (Elevated)`, weight: 0.5 });
+    }
+  }
+
   // ── Respiratory rate scoring ──
   const rr = state.vitals.respiratoryRate.value;
   if (rr !== null && rr > 24) {
@@ -113,7 +125,11 @@ export function calculateRisk(state: PatientState): RiskAssessment {
       score += 0.5;
       factors.push({ description: "Diabetes", weight: 0.5 });
     }
-    if (val.includes("prior mi") || val.includes("previous mi") || val.includes("myocardial infarction")) {
+    if (
+      (val.includes("prior mi") || val.includes("previous mi") || val.includes("myocardial infarction")) &&
+      !val.includes("no prior") &&
+      !val.includes("no previous")
+    ) {
       score += 1;
       factors.push({ description: "Prior MI", weight: 1 });
     }
@@ -131,7 +147,25 @@ export function calculateRisk(state: PatientState): RiskAssessment {
     }
   }
 
-  // ── Nausea scoring (minor) ──
+  // ── Additional symptom scoring (dizziness, diaphoresis, confusion, nausea) ──
+  const dizziness = state.symptoms.find((s) => s.name.toLowerCase().includes("dizziness"));
+  if (dizziness && dizziness.severity.value && dizziness.severity.value !== "none" && dizziness.severity.value !== "resolved") {
+    score += 0.5;
+    factors.push({ description: `Dizziness (${dizziness.severity.value})`, weight: 0.5 });
+  }
+
+  const sweating = state.symptoms.find((s) => s.name.toLowerCase().includes("sweating"));
+  if (sweating && sweating.severity.value && sweating.severity.value !== "none" && sweating.severity.value !== "resolved") {
+    score += 0.5;
+    factors.push({ description: `Diaphoresis (${sweating.severity.value})`, weight: 0.5 });
+  }
+
+  const confusion = state.symptoms.find((s) => s.name.toLowerCase().includes("confusion"));
+  if (confusion && confusion.severity.value && confusion.severity.value !== "none" && confusion.severity.value !== "resolved") {
+    score += 1.5;
+    factors.push({ description: `Confusion (${confusion.severity.value})`, weight: 1.5 });
+  }
+
   const nausea = state.symptoms.find((s) => s.name.toLowerCase().includes("nausea"));
   if (nausea && nausea.severity.value && nausea.severity.value !== "none" && nausea.severity.value !== "resolved") {
     score += 0.5;
@@ -159,21 +193,25 @@ export function calculateRisk(state: PatientState): RiskAssessment {
 
   // ── Determine level ──
   let level: RiskLevel;
-  if (activeContradictions.length > 0 && missingCritical.length > 2) {
-    level = "UNRESOLVED";
-    reasons.push("Multiple unresolved contradictions with significant missing data");
-  } else if (score >= 8) {
+  if (score >= 8) {
     level = "CRITICAL";
     reasons.push("Risk score exceeds critical threshold (≥8)");
   } else if (score >= 6) {
     level = "HIGH";
     reasons.push("Risk score in high range (6–7)");
-  } else if (score >= 4) {
+  } else if (score >= 3.5) {
     level = "MODERATE";
-    reasons.push("Risk score in moderate range (4–5)");
+    reasons.push("Risk score in moderate range (3.5–5)");
+  } else if (missingCritical.length >= 4 || (activeContradictions.length > 0 && missingCritical.length > 2)) {
+    level = "UNRESOLVED";
+    reasons.push(
+      activeContradictions.length > 0
+        ? "Active contradictions with significant missing data prevent safe low-risk routing"
+        : "Critical data missing across multiple safety fields — cannot establish safe low-risk routing"
+    );
   } else {
     level = "LOW";
-    reasons.push("Risk score below moderate threshold (<4)");
+    reasons.push("Risk score below moderate threshold (<3.5)");
   }
 
   return {

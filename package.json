@@ -7,9 +7,11 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "evaluate": "npx tsx src/evaluation/evaluationRunner.ts",
     "format": "oxfmt"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.116.0",
     "lucide-react": "0.544.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

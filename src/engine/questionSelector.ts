@@ -288,7 +288,7 @@ function isFieldKnown(state: PatientState, resolvesField: string): boolean {
   // Check symptoms
   for (const s of state.symptoms) {
     if (lower.includes(s.name.toLowerCase()) && lower.includes("severity")) {
-      return s.severity.status === "Known" || s.severity.status === "Updated";
+      return (s.severity.status === "Known" || s.severity.status === "Updated") && s.severity.value !== "resolved";
     }
   }
 
@@ -331,8 +331,13 @@ function uncertaintyReduction(state: PatientState, question: Question): number {
   if (known) return 0;
 
   // Higher reduction for critical missing fields
-  if (state.missingCriticalFields.some((f) => f.toLowerCase().includes(question.resolvesField.toLowerCase()))) {
-    return 3;
+  const qField = question.resolvesField.toLowerCase();
+  const isCritical = state.missingCriticalFields.some(
+    (f) => f.toLowerCase().includes(qField) || qField.includes(f.toLowerCase())
+  );
+
+  if (isCritical) {
+    return 6;
   }
   return 2;
 }

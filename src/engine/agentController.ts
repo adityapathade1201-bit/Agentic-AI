@@ -262,9 +262,12 @@ export function processAnswer(agentState: AgentState, answer: Answer): AgentStat
       kind: "route",
     });
   }
-  if (reassessResult.newContradictions.length > 0) {
-    for (const c of reassessResult.newContradictions) {
-      state.contradictions.push(c);
+  // Synchronize contradictions
+  const previousContradictionCount = state.contradictions.length;
+  state.contradictions = ps.contradictions.slice();
+  if (state.contradictions.length > previousContradictionCount) {
+    for (let i = previousContradictionCount; i < state.contradictions.length; i++) {
+      const c = state.contradictions[i];
       state.agentActivity.push({
         time: timestamp(),
         event: "Contradiction detected",
@@ -366,16 +369,28 @@ function decideWhetherToContinue(
   // Stop if we've hit the max
   if (state.questionsAsked >= MAX_QUESTIONS) return false;
 
-  // Stop if escalated with critical contradictions
-  if (escalation.shouldEscalate && escalation.unresolvedContradictions > 1) return false;
-
-  // Stop if risk is CRITICAL and we have enough info
-  if (state.riskAssessment?.level === "CRITICAL" && state.patientState.missingCriticalFields.length <= 2) {
+  // Stop if escalated with active critical contradictions
+  if (escalation.shouldEscalate && escalation.unresolvedContradictions >= 1 && state.questionsAsked >= 2) {
     return false;
   }
 
-  // Stop if LOW risk and all critical fields known
-  if (state.riskAssessment?.level === "LOW" && state.patientState.missingCriticalFields.length <= 1) {
+  // Stop if risk is CRITICAL and we have adequate safety data
+  if (state.riskAssessment?.level === "CRITICAL" && state.patientState.missingCriticalFields.length <= 3 && state.questionsAsked >= 2) {
+    return false;
+  }
+
+  // Stop if HIGH risk and key questions answered
+  if (state.riskAssessment?.level === "HIGH" && state.patientState.missingCriticalFields.length <= 2 && state.questionsAsked >= 3) {
+    return false;
+  }
+
+  // Stop if MODERATE risk and enough data gathered
+  if (state.riskAssessment?.level === "MODERATE" && state.patientState.missingCriticalFields.length <= 2 && state.questionsAsked >= 4) {
+    return false;
+  }
+
+  // Stop if LOW risk and core critical fields known
+  if (state.riskAssessment?.level === "LOW" && state.patientState.missingCriticalFields.length <= 2 && state.questionsAsked >= 3) {
     return false;
   }
 

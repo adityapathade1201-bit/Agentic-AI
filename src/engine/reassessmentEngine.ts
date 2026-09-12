@@ -47,26 +47,28 @@ export function reassess(
   const previousRisk = state.riskAssessment;
   const previousRouting = state.routingDecision;
 
-  // Step 1: Detect new contradictions
+  // Step 1: Detect contradictions
   const allContradictions = detectContradictions(state);
-  const newContradictions = allContradictions.filter(
-    (c) => !state.contradictions.some(
-      (existing) => existing.field === c.field && existing.previousValue === c.previousValue && existing.newValue === c.newValue
-    )
-  );
+  const newContradictions: Contradiction[] = [];
 
-  if (newContradictions.length > 0) {
-    for (const c of newContradictions) {
-      traceEntries.push({
-        step: ++step,
-        time: timestamp(),
-        type: "CONTRADICTION_DETECTED",
-        component: "Contradiction Detector",
-        action: `Contradiction detected on "${c.field}"`,
-        result: `${c.previousValue} → ${c.newValue}`,
-        note: c.reason,
-      });
+  for (const c of allContradictions) {
+    if (!state.contradictions.some((existing) => existing.field === c.field && existing.previousValue === c.previousValue && existing.newValue === c.newValue)) {
+      state.contradictions.push(c);
+      newContradictions.push(c);
     }
+  }
+
+  // Create trace entries for all newly detected contradictions
+  for (const c of newContradictions) {
+    traceEntries.push({
+      step: ++step,
+      time: timestamp(),
+      type: "CONTRADICTION_DETECTED",
+      component: "Contradiction Detector",
+      action: `Contradiction detected on "${c.field}"`,
+      result: `${c.previousValue} → ${c.newValue}`,
+      note: c.reason,
+    });
   }
 
   // Step 2: Recalculate risk

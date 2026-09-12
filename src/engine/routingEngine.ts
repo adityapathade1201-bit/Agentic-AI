@@ -15,7 +15,7 @@ const routingMap: Record<RiskLevel, { outcome: RoutingOutcome; escalate: boolean
   LOW: { outcome: "Standard", escalate: false },
   MODERATE: { outcome: "Urgent Assessment", escalate: false },
   HIGH: { outcome: "Immediate / Emergency", escalate: false },
-  CRITICAL: { outcome: "Immediate / Escalation", escalate: true },
+  CRITICAL: { outcome: "Immediate / Emergency", escalate: false },
   UNRESOLVED: { outcome: "Human Review / Escalation", escalate: true },
 };
 
@@ -39,17 +39,17 @@ export function determineRouting(
   }
 
   // Override: if concerning evidence with many unknowns
-  if (missingCount > 3 && contradictionCount > 0) {
+  if (missingCount > 3 && (contradictionCount > 0 || riskLevel === "UNRESOLVED")) {
     outcome = "Human Review / Escalation";
     escalate = true;
-    reason = `${missingCount} missing critical fields with ${contradictionCount} contradiction(s) — escalating to human review`;
+    reason = `${missingCount} missing critical fields — escalating to human review`;
   }
 
-  // Override: if HIGH and worsening (has contradictions indicating deterioration)
-  if (riskLevel === "HIGH" && contradictionCount > 0) {
+  // Override: if HIGH or CRITICAL and has active contradictions
+  if ((riskLevel === "HIGH" || riskLevel === "CRITICAL") && contradictionCount > 0) {
     outcome = "Immediate / Escalation";
     escalate = true;
-    reason = `Risk level HIGH with active contradiction(s) — escalating to immediate`;
+    reason = `Risk level ${riskLevel} with active contradiction(s) — escalating to immediate escalation`;
   }
 
   return {

@@ -27,12 +27,9 @@ export function evaluateEscalation(state: PatientState): EscalationResult {
 
   const reasons: string[] = [];
 
-  // Check CRITICAL or UNRESOLVED risk
-  if (riskLevel === "CRITICAL") {
-    reasons.push("Risk level is CRITICAL — requires immediate attention");
-  }
+  // Check UNRESOLVED risk (insufficient data)
   if (riskLevel === "UNRESOLVED") {
-    reasons.push("Risk level is UNRESOLVED — insufficient data for safe routing");
+    reasons.push("Risk level is UNRESOLVED — insufficient data for safe automated routing");
   }
 
   // Check critical contradictions
@@ -45,10 +42,10 @@ export function evaluateEscalation(state: PatientState): EscalationResult {
     );
   }
 
-  // Check missing critical fields with concerning evidence
-  if (missingCount > 3 && riskScore >= 4) {
+  // Check missing critical fields (insufficient data)
+  if (missingCount >= 4) {
     reasons.push(
-      `${missingCount} missing critical fields with risk score ${riskScore} — cannot establish safe routing`
+      `${missingCount} critical fields remain unknown — cannot establish safe routing without clinical evaluation`
     );
   }
 

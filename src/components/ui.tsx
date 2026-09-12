@@ -98,6 +98,28 @@ const statusStyle: Record<FieldStatus, { bg: string; color: string }> = {
   Conflicting: { bg: "#fdeaea", color: "#e02424" },
 };
 
+export function Badge({
+  children,
+  variant = "neutral",
+}: {
+  children: ReactNode;
+  variant?: "neutral" | "ok" | "warn" | "high";
+}) {
+  const badgeColors = {
+    neutral: "bg-muted text-muted-foreground border-border",
+    ok: "bg-emerald-50 text-emerald-800 border-emerald-200",
+    warn: "bg-amber-50 text-amber-800 border-amber-200",
+    high: "bg-rose-50 text-rose-800 border-rose-200",
+  };
+  return (
+    <span
+      className={`inline-flex items-center font-mono text-[10px] uppercase font-600 px-2 py-0.5 rounded border ${badgeColors[variant]}`}
+    >
+      {children}
+    </span>
+  );
+}
+
 export function FieldStatusBadge({ status }: { status: FieldStatus }) {
   const s = statusStyle[status];
   return (

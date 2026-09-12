@@ -198,3 +198,52 @@ User answers ──→ processAnswer()                               │
 4. **Escalation over certainty** — System escalates when it cannot establish safe routing
 5. **Transparent scoring** — Every risk factor and weight visible to the operator
 6. **Modular separation** — LLM can interpret, but never decides routing
+
+## Agent Evaluation & Validation
+
+Phase 4 introduces an automated evaluation harness (`src/evaluation/`) to validate agent behavior and test system invariants against all synthetic patient cases without mocking or duplicating production logic.
+
+### How the Evaluator Works
+
+1. **Direct Engine Execution**: `evaluationRunner.ts` calls `initSession()` and iteratively executes `processAnswer()` using the production `agentController.ts`, `stateManager.ts`, `riskEngine.ts`, `contradictionDetector.ts`, `reassessmentEngine.ts`, and `escalationEngine.ts`.
+2. **Adaptive State Tracing**: At every turn, the evaluator snapshots:
+   - Candidate question ranking & selection rationale
+   - Patient state before & after the action
+   - Risk score delta & level transitions
+   - Routing updates & contradiction detections
+   - Reassessment & escalation trigger states
+3. **Deterministic Invariant Assertions**: Every test case validates 9 core invariants:
+   - No duplicate questions asked within a session
+   - Question count bounded by `MAX_QUESTIONS` (≤ 10)
+   - Question count within case expected bounds
+   - Contradiction correctly detected or avoided without false positives
+   - Escalation policy strictly followed (human review triggered when uncertainty/contradictions exceed policy)
+   - Valid terminal session status (`completed` or `escalated`)
+   - Session status strictly aligns with escalation state
+   - Zero runtime errors or unhandled exceptions
+   - Final routing decision matches expected outcome
+4. **Triage Classification**: Routing is compared against expected outcomes and classified into:
+   - `CORRECT` — Exact match
+   - `UNDER_TRIAGE` — Safety failure where assigned urgency is lower than required
+   - `OVER_TRIAGE` — Assigned urgency is higher than required
+   - `MISMATCH` — Category divergence
+
+### Metrics Measured
+
+- **Routing Accuracy**: Percentage of synthetic cases where final routing matches clinical benchmark.
+- **Average Questions per Case**: Efficiency metric demonstrating adaptive early-stopping when sufficient evidence is gathered.
+- **Contradiction Detection Rate**: Proportion of conflicting transitions (e.g. resolved → severe chest pain) correctly captured.
+- **Escalation Rate**: Proportion of sessions appropriately deferred to human clinicians.
+- **Reassessment Rate**: Frequency of live risk recalculation after new information.
+- **Under-Triage / Over-Triage Counts**: Core patient safety indicators.
+
+### Running Evaluations
+
+```bash
+npm run evaluate
+```
+
+### Limitations
+
+- Synthetic test suite reflects 6 curated scenarios (demographic, contradiction, missing-data, deteriorating vital edge cases).
+- Rules and scoring weights are simulation benchmarks and are not clinically validated for real patient triage.

@@ -41,6 +41,8 @@ export default function ActiveTriage({ onTrace }: { onTrace: () => void }) {
     submitAnswer,
     escalation,
     contradictions,
+    allCandidates = [],
+    turnSnapshots = [],
   } = useTriageContext();
 
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
@@ -245,28 +247,130 @@ export default function ActiveTriage({ onTrace }: { onTrace: () => void }) {
                 </div>
               )}
 
-              <div className="mt-5 flex items-start gap-2.5 rounded-md bg-accent/60 border border-border px-3.5 py-3">
-                <HelpCircle size={15} className="mt-0.5 shrink-0 text-primary" />
-                <div>
-                  <div className="font-mono text-[10px] uppercase tracking-wide text-primary mb-0.5">
-                    Why this question?
+              <div className="mt-5 space-y-3">
+                <div className="flex items-start gap-2.5 rounded-md bg-accent/60 border border-border px-3.5 py-3">
+                  <HelpCircle size={15} className="mt-0.5 shrink-0 text-primary" />
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between gap-2 mb-0.5">
+                      <div className="font-mono text-[10px] uppercase tracking-wide text-primary font-600">
+                        Why this question was selected
+                      </div>
+                      <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-600">
+                        Selection score: {currentQuestion.score}
+                      </span>
+                    </div>
+                    <p className="text-[13px] text-muted-foreground leading-snug">
+                      {currentQuestion.question.rationale}
+                    </p>
+                    <div className="mt-2.5 flex flex-wrap gap-1.5 font-mono text-[10.5px]">
+                      <span className="px-2 py-0.5 rounded bg-card border border-border text-foreground">
+                        Safety: <strong className="text-primary font-600">{currentQuestion.breakdown.safetyRelevance}</strong>/10
+                      </span>
+                      <span className="px-2 py-0.5 rounded bg-card border border-border text-foreground">
+                        Risk Impact: <strong className="text-primary font-600">+{currentQuestion.breakdown.riskImpact}</strong>
+                      </span>
+                      <span className="px-2 py-0.5 rounded bg-card border border-border text-foreground">
+                        Uncertainty Red.: <strong className="text-primary font-600">+{currentQuestion.breakdown.uncertaintyReduction}</strong>
+                      </span>
+                      <span className="px-2 py-0.5 rounded bg-card border border-border text-foreground">
+                        Routing Impact: <strong className="text-primary font-600">+{currentQuestion.breakdown.routingImpact}</strong>
+                      </span>
+                    </div>
                   </div>
-                  <p className="text-[13px] text-muted-foreground leading-snug">
-                    {currentQuestion.question.rationale}
-                  </p>
-                  <div className="mt-2 flex flex-wrap gap-2 font-mono text-[10px]">
-                    <span className="px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
-                      safety: {currentQuestion.breakdown.safetyRelevance}
+                </div>
+
+                {/* Candidate alternatives ranking */}
+                {allCandidates.length > 1 && (
+                  <div className="rounded-md border border-border bg-panel p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="font-mono text-[10.5px] uppercase tracking-wide text-muted-foreground font-600">
+                        Evaluated Candidate Probes ({allCandidates.length} evaluated)
+                      </div>
+                      <span className="text-[11px] text-muted-foreground">Highest info-gain selected</span>
+                    </div>
+                    <div className="space-y-1.5">
+                      {allCandidates.slice(0, 4).map((cand, idx) => {
+                        const isSelected = cand.question.id === currentQuestion.question.id;
+                        return (
+                          <div
+                            key={cand.question.id}
+                            className={`flex items-center justify-between text-[12px] px-2.5 py-1.5 rounded transition-all ${
+                              isSelected
+                                ? "bg-primary/10 border border-primary/30 font-500"
+                                : "bg-card border border-border/50 text-muted-foreground hover:bg-muted/50"
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 truncate pr-2">
+                              <span className="font-mono text-[10px] w-4 text-center font-600 shrink-0">
+                                #{idx + 1}
+                              </span>
+                              <span className="truncate">{cand.question.text}</span>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className="font-mono text-[10px] text-muted-foreground">
+                                {cand.question.resolvesField}
+                              </span>
+                              <span
+                                className={`font-mono text-[11px] px-1.5 py-0.5 rounded font-600 ${
+                                  isSelected ? "bg-primary text-primary-foreground" : "bg-muted text-foreground"
+                                }`}
+                              >
+                                {cand.score} pts
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </Card>
+          )}
+
+          {/* Before/After Recent Turn Transition */}
+          {turnSnapshots.length > 0 && (
+            <Card pad={false} className="overflow-hidden">
+              <div className="px-4 py-2.5 border-b border-border flex items-center justify-between bg-muted/30">
+                <div className="font-mono text-[10.5px] uppercase tracking-wide text-muted-foreground font-600">
+                  Last Update Transition · Turn {turnSnapshots[turnSnapshots.length - 1].turnNumber}
+                </div>
+                <span className="font-mono text-[11px] text-muted-foreground">
+                  {turnSnapshots[turnSnapshots.length - 1].timestamp}
+                </span>
+              </div>
+              <div className="p-3.5 grid grid-cols-2 gap-3 text-[12.5px]">
+                <div className="rounded-md border border-border/70 p-2.5 bg-panel">
+                  <div className="font-mono text-[10px] uppercase text-muted-foreground mb-1">State Before Answer</div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Risk Score:</span>
+                    <span className="font-mono font-600">{turnSnapshots[turnSnapshots.length - 1].riskBefore?.score ?? "—"} ({turnSnapshots[turnSnapshots.length - 1].riskBefore?.level ?? "LOW"})</span>
+                  </div>
+                  <div className="flex items-center justify-between mt-1">
+                    <span className="text-muted-foreground">Routing:</span>
+                    <span className="font-500">{turnSnapshots[turnSnapshots.length - 1].routingBefore?.outcome ?? "—"}</span>
+                  </div>
+                  <div className="text-[11px] text-muted-foreground mt-1 truncate">
+                    Missing: {turnSnapshots[turnSnapshots.length - 1].missingBefore.length} critical fields
+                  </div>
+                </div>
+
+                <div className="rounded-md border border-primary/30 p-2.5 bg-primary/5">
+                  <div className="font-mono text-[10px] uppercase text-primary font-600 mb-1">State After Reassessment</div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">New Score:</span>
+                    <span className="font-mono font-700 text-primary">
+                      {turnSnapshots[turnSnapshots.length - 1].riskAfter.score} ({turnSnapshots[turnSnapshots.length - 1].riskAfter.level})
                     </span>
-                    <span className="px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
-                      risk: {currentQuestion.breakdown.riskImpact}
+                  </div>
+                  <div className="flex items-center justify-between mt-1">
+                    <span className="text-muted-foreground">New Routing:</span>
+                    <span className="font-600" style={{ color: getRoutingColor(turnSnapshots[turnSnapshots.length - 1].routingAfter.outcome) }}>
+                      {turnSnapshots[turnSnapshots.length - 1].routingAfter.outcome}
                     </span>
-                    <span className="px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
-                      uncertainty: {currentQuestion.breakdown.uncertaintyReduction}
-                    </span>
-                    <span className="px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
-                      score: {currentQuestion.score}
-                    </span>
+                  </div>
+                  <div className="text-[11px] text-muted-foreground mt-1 truncate">
+                    Remaining: {turnSnapshots[turnSnapshots.length - 1].missingAfter.length} critical fields
                   </div>
                 </div>
               </div>

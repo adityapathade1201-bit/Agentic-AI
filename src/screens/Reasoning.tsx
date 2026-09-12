@@ -1,14 +1,23 @@
+import { useState } from "react";
 import {
   ArrowRight,
   AlertTriangle,
   GitCommitVertical,
   ShieldAlert,
   TrendingUp,
+  RefreshCw,
+  Eye,
+  Brain,
+  Play,
+  Download,
+  FileSpreadsheet,
+  CheckCircle2,
 } from "lucide-react";
 import { Card, SectionLabel, Button, FieldStatusBadge, RiskBadge } from "../components/ui";
 import { PageWrap } from "../components/Shell";
 import { useTriageContext } from "../context/TriageContext";
 import { getRoutingColor } from "../engine/routingEngine";
+import type { TraceEventType } from "../domain/types";
 
 /* ── Screen 4 — Patient State timeline ───────────────────────── */
 export function PatientStateScreen() {
@@ -248,9 +257,51 @@ export function RiskAssessmentScreen() {
   );
 }
 
+export type AgentCycleStage =
+  | "OBSERVE"
+  | "DECIDE"
+  | "ACT"
+  | "RECEIVE"
+  | "UPDATE"
+  | "REASSESS"
+  | "ADAPT"
+  | "ROUTE / ESCALATE";
+
+export function getAgentCycleStage(type: TraceEventType): {
+  stage: AgentCycleStage;
+  badgeClass: string;
+  icon: typeof Eye;
+} {
+  switch (type) {
+    case "STATE_INITIALIZED":
+    case "MISSING_INFO_IDENTIFIED":
+      return { stage: "OBSERVE", badgeClass: "bg-blue-100 text-blue-900 border-blue-200", icon: Eye };
+    case "CANDIDATES_EVALUATED":
+      return { stage: "DECIDE", badgeClass: "bg-purple-100 text-purple-900 border-purple-200", icon: Brain };
+    case "QUESTION_SELECTED":
+      return { stage: "ACT", badgeClass: "bg-indigo-100 text-indigo-900 border-indigo-200", icon: Play };
+    case "ANSWER_RECEIVED":
+      return { stage: "RECEIVE", badgeClass: "bg-teal-100 text-teal-900 border-teal-200", icon: Download };
+    case "STATE_UPDATED":
+      return { stage: "UPDATE", badgeClass: "bg-cyan-100 text-cyan-900 border-cyan-200", icon: FileSpreadsheet };
+    case "CONTRADICTION_DETECTED":
+    case "RISK_CALCULATED":
+      return { stage: "REASSESS", badgeClass: "bg-amber-100 text-amber-900 border-amber-200", icon: RefreshCw };
+    case "REASSESSMENT_TRIGGERED":
+      return { stage: "ADAPT", badgeClass: "bg-orange-100 text-orange-900 border-orange-200", icon: TrendingUp };
+    case "ROUTING_UPDATED":
+    case "ESCALATION_TRIGGERED":
+    case "SESSION_COMPLETED":
+      return { stage: "ROUTE / ESCALATE", badgeClass: "bg-rose-100 text-rose-900 border-rose-200", icon: ShieldAlert };
+    default:
+      return { stage: "OBSERVE", badgeClass: "bg-muted text-muted-foreground border-border", icon: Eye };
+  }
+}
+
 /* ── Screen 6 — Decision Trace ───────────────────────────────── */
 export function DecisionTraceScreen() {
   const { decisionTrace, caseId } = useTriageContext();
+  const [filterStage, setFilterStage] = useState<string>("ALL");
 
   if (decisionTrace.length === 0) {
     return (
@@ -264,44 +315,90 @@ export function DecisionTraceScreen() {
     );
   }
 
+  const stagesList: { id: string; label: string; count: number }[] = [
+    { id: "ALL", label: "All Steps", count: decisionTrace.length },
+    { id: "OBSERVE", label: "Observe", count: decisionTrace.filter((s) => getAgentCycleStage(s.type).stage === "OBSERVE").length },
+    { id: "DECIDE", label: "Decide", count: decisionTrace.filter((s) => getAgentCycleStage(s.type).stage === "DECIDE").length },
+    { id: "ACT", label: "Act", count: decisionTrace.filter((s) => getAgentCycleStage(s.type).stage === "ACT").length },
+    { id: "RECEIVE", label: "Receive", count: decisionTrace.filter((s) => getAgentCycleStage(s.type).stage === "RECEIVE").length },
+    { id: "UPDATE", label: "Update", count: decisionTrace.filter((s) => getAgentCycleStage(s.type).stage === "UPDATE").length },
+    { id: "REASSESS", label: "Reassess", count: decisionTrace.filter((s) => getAgentCycleStage(s.type).stage === "REASSESS").length },
+    { id: "ROUTE / ESCALATE", label: "Route / Escalate", count: decisionTrace.filter((s) => getAgentCycleStage(s.type).stage === "ROUTE / ESCALATE").length },
+  ];
+
+  const filteredTrace = filterStage === "ALL"
+    ? decisionTrace
+    : decisionTrace.filter((s) => getAgentCycleStage(s.type).stage === filterStage);
+
   return (
     <PageWrap>
-      <SectionLabel>Audit Trail · {caseId}</SectionLabel>
-      <h2 className="font-display font-700 text-[24px] mt-1 mb-1">Decision Trace</h2>
-      <p className="text-sm text-muted-foreground mb-6 max-w-[62ch]">
-        A complete, reproducible record of how the agent reached its current
-        decision — every component, action, and result in sequence.
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
+        <div>
+          <SectionLabel>Audit Trail · {caseId}</SectionLabel>
+          <h2 className="font-display font-700 text-[24px] mt-1">Agent Decision Trace</h2>
+        </div>
+        <div className="font-mono text-[11px] text-muted-foreground">
+          {decisionTrace.length} total logged events
+        </div>
+      </div>
+      <p className="text-sm text-muted-foreground mb-4 max-w-[64ch]">
+        A complete, reproducible execution record structured into the canonical agent loop:
+        <strong> Observe → Decide → Act → Receive → Update → Reassess → Adapt → Route</strong>.
       </p>
 
+      {/* Stage Filter Tabs */}
+      <div className="flex flex-wrap gap-1.5 mb-5 pb-3 border-b border-border">
+        {stagesList.map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setFilterStage(tab.id)}
+            className={`px-3 py-1.5 rounded-md text-[12px] font-500 font-mono transition-all cursor-pointer flex items-center gap-1.5 ${
+              filterStage === tab.id
+                ? "bg-primary text-primary-foreground font-600 shadow-sm"
+                : "bg-card border border-border text-muted-foreground hover:bg-muted"
+            }`}
+          >
+            <span>{tab.label}</span>
+            <span className={`text-[10px] px-1.5 py-0.2 rounded ${filterStage === tab.id ? "bg-primary-foreground/20 text-white" : "bg-muted text-muted-foreground"}`}>
+              {tab.count}
+            </span>
+          </button>
+        ))}
+      </div>
+
       <div className="relative">
-        <div className="absolute left-[15px] top-2 bottom-2 w-px bg-border" />
+        <div className="absolute left-[19px] top-4 bottom-4 w-px bg-border/80" />
         <div className="space-y-3">
-          {decisionTrace.map((s) => {
+          {filteredTrace.map((s) => {
+            const cycleInfo = getAgentCycleStage(s.type);
             const isConflict = s.type === "CONTRADICTION_DETECTED" || s.type === "ESCALATION_TRIGGERED";
             return (
-              <div key={`${s.step}-${s.type}`} className="relative flex gap-4">
+              <div key={`${s.step}-${s.type}`} className="relative flex gap-4 items-start">
                 <div
-                  className={`relative z-10 grid place-items-center h-8 w-8 rounded-full border font-mono text-[11px] font-600 shrink-0 ${
+                  className={`relative z-10 grid place-items-center h-10 w-10 rounded-full border-2 font-mono text-[11px] font-700 shrink-0 ${
                     isConflict
-                      ? "bg-[#fdeaea] border-[var(--risk-high)] text-risk-high"
-                      : "bg-card border-border text-primary"
+                      ? "bg-[#fdeaea] border-[var(--risk-high)] text-risk-high shadow-sm"
+                      : "bg-card border-primary/30 text-primary shadow-sm"
                   }`}
                 >
                   {s.step}
                 </div>
-                <Card className={`flex-1 py-3.5 ${isConflict ? "border-[var(--risk-high)]/40 bg-[#fdeaea]/20" : ""}`}>
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <Card className={`flex-1 py-3.5 px-4 transition-all ${isConflict ? "border-[var(--risk-high)]/60 bg-[#fdeaea]/20" : ""}`}>
+                  <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
                     <span className="font-mono text-[11px] text-muted-foreground tnum">{s.time}</span>
-                    <span className="font-mono text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-accent text-primary">
+                    <span className={`font-mono text-[10px] uppercase font-700 tracking-wider px-2 py-0.5 rounded border ${cycleInfo.badgeClass}`}>
+                      {cycleInfo.stage}
+                    </span>
+                    <span className="font-mono text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
                       {s.component}
                     </span>
-                    <span className="font-600 text-[14px]">{s.action}</span>
-                    <span className="ml-auto flex items-center gap-1.5 font-mono text-[12px]">
+                    <span className="font-600 text-[13.5px] text-foreground">{s.action}</span>
+                    <span className="ml-auto flex items-center gap-1.5 font-mono text-[12px] font-600 text-primary">
                       <GitCommitVertical size={13} className="text-muted-foreground" />
                       {s.result}
                     </span>
                   </div>
-                  <p className="text-[12.5px] text-muted-foreground mt-1.5 leading-snug">{s.note}</p>
+                  <p className="text-[12.5px] text-muted-foreground mt-2 leading-relaxed font-sans">{s.note}</p>
                 </Card>
               </div>
             );
@@ -316,108 +413,140 @@ export function DecisionTraceScreen() {
 export function ReassessmentScreen({ onEscalate }: { onEscalate?: () => void }) {
   const { contradictions, riskAssessment, routingDecision, decisionTrace, escalation, caseId } = useTriageContext();
 
-  // Build flow from most recent contradiction events
-  const latestContradiction = contradictions.length > 0 ? contradictions[contradictions.length - 1] : null;
-
-  // Find risk change events
-  const riskEvents = decisionTrace.filter((t) => t.type === "RISK_CALCULATED");
-  const prevRiskEvent = riskEvents.length >= 2 ? riskEvents[riskEvents.length - 2] : null;
-  const routingEvents = decisionTrace.filter((t) => t.type === "ROUTING_UPDATED");
-  const prevRoutingEvent = routingEvents.length >= 2 ? routingEvents[routingEvents.length - 2] : null;
-
-  const flow = latestContradiction
-    ? [
-        {
-          label: "Old state",
-          detail: `${latestContradiction.field} = ${latestContradiction.previousValue}`,
-          tone: "muted",
-        },
-        {
-          label: "Conflict detected",
-          detail: `New answer: ${latestContradiction.field} = ${latestContradiction.newValue}`,
-          tone: "high",
-        },
-        { label: "State invalidated", detail: "Prior estimate discarded", tone: "high" },
-        {
-          label: "Risk recalculated",
-          detail: prevRiskEvent ? prevRiskEvent.result : `Score ${riskAssessment?.score ?? "?"}`,
-          tone: "high",
-        },
-        {
-          label: "Routing reassessed",
-          detail: routingDecision?.outcome ?? "Pending",
-          tone: "high",
-        },
-      ]
-    : [
-        { label: "No contradictions", detail: "State is consistent", tone: "muted" },
-      ];
+  const reassessEvents = decisionTrace.filter(
+    (t) => t.type === "RISK_CALCULATED" || t.type === "ROUTING_UPDATED" || t.type === "CONTRADICTION_DETECTED" || t.type === "ESCALATION_TRIGGERED"
+  );
 
   return (
     <PageWrap>
-      <div className="max-w-[720px] mx-auto">
-        <SectionLabel>Reassessment · {caseId ?? "No session"}</SectionLabel>
-        <h2 className="font-display font-700 text-[24px] mt-1 mb-5">Contradiction Handling</h2>
+      <div className="max-w-[760px] mx-auto">
+        <div className="flex items-center justify-between gap-3 mb-2">
+          <div>
+            <SectionLabel>Live Reassessment Engine · {caseId ?? "No session"}</SectionLabel>
+            <h2 className="font-display font-700 text-[24px] mt-1">Contradiction & Reassessment Audit</h2>
+          </div>
+          {contradictions.length > 0 && (
+            <span className="font-mono text-[11px] px-2.5 py-1 rounded bg-[#fdeaea] border border-[var(--risk-high)] text-risk-high font-600">
+              {contradictions.length} Active Contradiction{contradictions.length > 1 ? "s" : ""}
+            </span>
+          )}
+        </div>
 
-        {latestContradiction ? (
-          <div className="rounded-lg border-2 border-[var(--risk-high)] bg-[#fdeaea]/60 p-5 mb-6">
-            <div className="flex items-center gap-2 mb-3">
-              <AlertTriangle size={18} style={{ color: "var(--risk-high)" }} />
-              <span className="font-display font-700 text-[17px]" style={{ color: "var(--risk-crit)" }}>
-                Contradiction detected
-              </span>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="rounded-md bg-card border border-border p-3">
-                <div className="font-mono text-[10px] uppercase text-muted-foreground mb-1">Previous</div>
-                <div className="font-mono text-[15px] line-through decoration-muted-foreground/50 text-muted-foreground">
-                  {latestContradiction.field} = {latestContradiction.previousValue}
+        <p className="text-sm text-muted-foreground mb-6">
+          The system enforces <strong>deterministic reassessment</strong> whenever state updates arrive.
+          Contradictory values invalidate prior estimates and recalculate risk without silent overwrites.
+        </p>
+
+        {/* Contradiction Cards */}
+        {contradictions.length > 0 ? (
+          <div className="space-y-4 mb-6">
+            {contradictions.map((c, idx) => (
+              <div key={idx} className="rounded-lg border-2 border-[var(--risk-high)] bg-[#fdeaea]/60 p-5 shadow-sm">
+                <div className="flex items-center justify-between gap-2 mb-3">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle size={18} style={{ color: "var(--risk-high)" }} />
+                    <span className="font-display font-700 text-[16px]" style={{ color: "var(--risk-crit)" }}>
+                      CONTRADICTION DETECTED: {c.field}
+                    </span>
+                  </div>
+                  <span className="font-mono text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-white border border-[var(--risk-high)]/40 font-700 text-risk-high">
+                    Severity: {c.severity}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 mb-4">
+                  <div className="rounded-md bg-card border border-border p-3">
+                    <div className="font-mono text-[10px] uppercase text-muted-foreground mb-0.5 font-600">Previous Known Value</div>
+                    <div className="font-mono text-[14px] line-through decoration-muted-foreground/60 text-muted-foreground font-500">
+                      {c.previousValue}
+                    </div>
+                  </div>
+                  <div className="rounded-md bg-card border-2 border-[var(--risk-high)] p-3">
+                    <div className="font-mono text-[10px] uppercase text-risk-high mb-0.5 font-600">Conflicting New Value</div>
+                    <div className="font-mono text-[14px] font-700" style={{ color: "var(--risk-high)" }}>
+                      {c.newValue}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2 rounded-md bg-card/80 border border-border p-3 text-[12.5px]">
+                  <div className="flex items-start gap-2">
+                    <strong className="font-600 min-w-[110px] text-foreground">Clinical Reason:</strong>
+                    <span className="text-muted-foreground">{c.reason}</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <strong className="font-600 min-w-[110px] text-foreground">Risk Impact:</strong>
+                    <span className="font-mono text-risk-high font-600">+1.0 Contradiction penalty added to risk score</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <strong className="font-600 min-w-[110px] text-foreground">Routing Impact:</strong>
+                    <span className="text-muted-foreground font-500">Elevated to Immediate / Escalation due to active clinical conflict</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <strong className="font-600 min-w-[110px] text-foreground">Escalation Impact:</strong>
+                    <span className="text-risk-crit font-600">Triggers mandatory human clinical review (Unsafe certainty prevented)</span>
+                  </div>
                 </div>
               </div>
-              <div className="rounded-md bg-card border border-[var(--risk-high)] p-3">
-                <div className="font-mono text-[10px] uppercase text-risk-high mb-1">New</div>
-                <div className="font-mono text-[15px] font-600" style={{ color: "var(--risk-high)" }}>
-                  {latestContradiction.field} = {latestContradiction.newValue}
-                </div>
-              </div>
-            </div>
+            ))}
           </div>
         ) : (
-          <Card className="mb-6">
-            <p className="text-sm text-muted-foreground text-center py-4">
-              No contradictions detected in the current session. Continue the triage or select a contradiction case (TRG-3004) to see this in action.
+          <Card className="mb-6 py-6 text-center">
+            <div className="flex justify-center mb-2">
+              <CheckCircle2 size={24} className="text-risk-low" />
+            </div>
+            <div className="font-600 text-[14px]">No Contradictions Detected in Active Session</div>
+            <p className="text-sm text-muted-foreground mt-1 max-w-[50ch] mx-auto">
+              Patient state history is currently consistent. Select <strong>TRG-3004</strong> to observe real-time contradiction detection and escalation.
             </p>
           </Card>
         )}
 
-        <div className="space-y-2 mb-6">
-          {flow.map((f, i) => (
-            <div key={i} className="flex flex-col items-center">
-              <div
-                className={`w-full flex items-center justify-between rounded-md border px-4 py-3 ${
-                  f.tone === "high"
-                    ? "border-[var(--risk-high)]/40 bg-[#fdeaea]/30"
-                    : "border-border bg-panel"
-                }`}
-              >
-                <span className="font-600 text-[13.5px]">{f.label}</span>
-                <span className="font-mono text-[12.5px] text-muted-foreground">{f.detail}</span>
+        {/* Live Reassessment Event Stream */}
+        <Card pad={false} className="mb-6">
+          <div className="px-5 py-3.5 border-b border-border flex items-center justify-between">
+            <div className="font-600 text-[14px]">Live Reassessment Event Stream</div>
+            <span className="font-mono text-[11px] text-muted-foreground">{reassessEvents.length} events logged</span>
+          </div>
+          <div className="divide-y divide-hairline">
+            {reassessEvents.length > 0 ? (
+              reassessEvents.map((ev, i) => (
+                <div key={i} className="p-3.5 flex items-start justify-between gap-3 text-[13px] hover:bg-muted/30">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-[10.5px] text-muted-foreground">{ev.time}</span>
+                      <span className="font-600 text-[13.5px]">{ev.action}</span>
+                    </div>
+                    <div className="text-[12px] text-muted-foreground mt-0.5">{ev.note}</div>
+                  </div>
+                  <span className="font-mono text-[12px] font-600 px-2 py-0.5 rounded bg-muted text-primary shrink-0">
+                    {ev.result}
+                  </span>
+                </div>
+              ))
+            ) : (
+              <div className="p-6 text-center text-sm text-muted-foreground">
+                Answer questions in Active Triage to trigger live reassessment events.
               </div>
-              {i < flow.length - 1 && <div className="h-4 w-px bg-[var(--risk-high)]/40" />}
-            </div>
-          ))}
-        </div>
-
-        <div className="rounded-md border border-border bg-accent/50 px-4 py-3 mb-5 text-[13px] text-muted-foreground">
-          The system <strong className="text-foreground">does not silently overwrite</strong> conflicting
-          information. Contradictory input invalidates the affected state and
-          forces a fresh assessment.
-        </div>
+            )}
+          </div>
+        </Card>
 
         {escalation?.shouldEscalate && (
-          <Button variant="danger" className="w-full h-12 text-[15px]" onClick={onEscalate}>
-            <ShieldAlert size={17} /> Escalate for human review
-          </Button>
+          <div className="space-y-3 mb-5">
+            <div className="rounded-lg border border-[var(--risk-high)] bg-[#fdeaea]/60 p-4">
+              <div className="flex items-center gap-2 mb-1">
+                <ShieldAlert size={16} className="text-risk-high" />
+                <span className="font-600 text-[13px] text-risk-crit">Escalation Threshold Triggered</span>
+              </div>
+              <p className="text-[12.5px] text-muted-foreground">{escalation.reason}</p>
+            </div>
+            {onEscalate && (
+              <Button variant="danger" className="w-full h-12 text-[15px]" onClick={onEscalate}>
+                <ShieldAlert size={17} /> Confirm Escalation to Human Clinician
+              </Button>
+            )}
+          </div>
         )}
       </div>
     </PageWrap>
