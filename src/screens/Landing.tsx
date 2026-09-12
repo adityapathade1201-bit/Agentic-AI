@@ -8,7 +8,13 @@ const pipeline = [
   { icon: LifeBuoy, name: "Escalation Policy", role: "Prevents unsafe certainty — hands off to humans when in doubt.", tone: "#e02424" },
 ];
 
-export default function Landing({ onEnter }: { onEnter: () => void }) {
+export default function Landing({
+  onEnter,
+  onArchitecture,
+}: {
+  onEnter: () => void;
+  onArchitecture: () => void;
+}) {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <div className="flex items-center justify-between h-16 px-6 md:px-10 border-b border-border">
@@ -45,7 +51,7 @@ export default function Landing({ onEnter }: { onEnter: () => void }) {
             <Button size="md" onClick={onEnter} className="px-5">
               Enter Simulation <ArrowRight size={16} />
             </Button>
-            <Button variant="secondary" size="md">
+            <Button variant="secondary" size="md" onClick={onArchitecture}>
               View Architecture
             </Button>
           </div>

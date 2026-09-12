@@ -11,6 +11,7 @@ import {
   DecisionTraceScreen,
   ReassessmentScreen,
 } from "./screens/Reasoning";
+import Architecture from "./screens/Architecture";
 import { TriageProvider } from "./context/TriageContext";
 
 const meta: Record<View, { title: string; crumb: string }> = {
@@ -21,6 +22,7 @@ const meta: Record<View, { title: string; crumb: string }> = {
   risk: { title: "Risk Assessment", crumb: "Reasoning" },
   trace: { title: "Decision Trace", crumb: "Reasoning" },
   reassess: { title: "Reassessment", crumb: "Reasoning" },
+  architecture: { title: "System Architecture", crumb: "System" },
   eval: { title: "Evaluation", crumb: "System" },
   settings: { title: "Settings", crumb: "System" },
 };
@@ -30,7 +32,20 @@ export default function App() {
   const [view, setView] = useState<View>("overview");
   const [collapsed, setCollapsed] = useState(false);
 
-  if (!entered) return <Landing onEnter={() => setEntered(true)} />;
+  if (!entered) {
+    return (
+      <Landing
+        onEnter={() => {
+          setEntered(true);
+          setView("overview");
+        }}
+        onArchitecture={() => {
+          setEntered(true);
+          setView("architecture");
+        }}
+      />
+    );
+  }
 
   const screens: Record<View, React.ReactNode> = {
     overview: <Overview onStart={() => setView("start")} />,
@@ -40,6 +55,12 @@ export default function App() {
     risk: <RiskAssessmentScreen />,
     trace: <DecisionTraceScreen />,
     reassess: <ReassessmentScreen onEscalate={() => setView("trace")} />,
+    architecture: (
+      <Architecture
+        onStart={() => setView("start")}
+        onDashboard={() => setView("overview")}
+      />
+    ),
     eval: <EvaluationScreen />,
     settings: <SettingsScreen />,
   };

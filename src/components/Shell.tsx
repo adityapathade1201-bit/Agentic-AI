@@ -12,6 +12,7 @@ import {
   ShieldAlert,
   ChevronLeft,
   Search,
+  Layers,
 } from "lucide-react";
 import { StatusDot } from "./ui";
 import { useTriageContext } from "../context/TriageContext";
@@ -25,7 +26,8 @@ export type View =
   | "trace"
   | "reassess"
   | "eval"
-  | "settings";
+  | "settings"
+  | "architecture";
 
 const nav: { id: View; label: string; icon: typeof LayoutDashboard; group: string }[] = [
   { id: "overview", label: "Overview", icon: LayoutDashboard, group: "Monitor" },
@@ -35,6 +37,7 @@ const nav: { id: View; label: string; icon: typeof LayoutDashboard; group: strin
   { id: "risk", label: "Risk Assessment", icon: Activity, group: "Reasoning" },
   { id: "trace", label: "Decision Trace", icon: GitBranch, group: "Reasoning" },
   { id: "reassess", label: "Reassessment", icon: RefreshCw, group: "Reasoning" },
+  { id: "architecture", label: "Architecture", icon: Layers, group: "System" },
   { id: "eval", label: "Evaluation", icon: BarChart3, group: "System" },
   { id: "settings", label: "Settings", icon: Settings, group: "System" },
 ];
