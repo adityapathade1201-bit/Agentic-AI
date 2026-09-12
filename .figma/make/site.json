@@ -1,0 +1,10 @@
+{
+  "description": "This healthcare AI dashboard provides a centralized command center for monitoring patient risks and decision-making support, enhancing clinical efficiency and safety.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
